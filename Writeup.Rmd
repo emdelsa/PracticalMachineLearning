@@ -14,6 +14,11 @@ This study is based on this reference: Velloso, E.; Bulling, A.; Gellersen, H.; 
 
 Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3ddIN4TAv
 
+```{r set-options, echo=FALSE, cache=FALSE}
+options(width = 120)
+```
+
+
 ## 2. Data Preparation
 The training data was dowloaded from : https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv. It was read into a training data frame using the following code:
 ```{r}
@@ -56,7 +61,14 @@ where the third line clears all the columns with NAs, which eliminates indirectl
 
 ## 3. Building a Model
 
+We first take a look at the training data distribution among classes:
+```{r}
+barplot(table(training$classe))
+```
+
+
 We will use cross validation on the training data set in order to estimate the accuracy of the model. For that purpose we create a data partition with p=0.6. 
+ 
 
 ```{r}
 library(caret)
@@ -65,7 +77,7 @@ train1 <- training[intrain1,]
 test1 <- training[-intrain1,]
 ```
 
-As stated in the introduction, our aim is to build a prediction model that predicts the class A,B,C,D,E from the sensor readings. We can start our analysis with a decission tree classification model:
+As stated in the introduction, our aim is to build a prediction model that predicts the class A,B,C,D,E from the sensor readings. We are aiming at an observed accuracy of 19/20 = 0.95. We can start our analysis with a decission tree classification model:
 
 ```{r}
 library(rpart)
@@ -74,7 +86,7 @@ model <- rpart(classe~.,data=train1)
 ```
 
 We can plot the resulting decission tree using the following code:
-```{r}
+```{r out.width=1000}
 library(rpart.plot)
 prp(model)
 
@@ -89,7 +101,7 @@ cmatrix <- confusionMatrix(predictions,test1$classe)
 cmatrix
 ```
 
-The 0.7 accuracy factor obtained is too low for our purposes, so we need to improve the training method. The article cited in the introduction already mentions that due to the inherent noise present in the sensor data, it is worth trying a *random forest* method. We therefore train our model with the following code:
+The 0.7 accuracy factor obtained is too low for our purposes, so we need to improve the training method. The article cited in the introduction already mentions that due to the inherent noise present in sensor readings, it is worth trying a *random forest* method. We therefore train our model with the following code:
 
 ```{r cache=TRUE}
 library(randomForest)
