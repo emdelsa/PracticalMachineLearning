@@ -1,0 +1,113 @@
+---
+title: "Human Activity Recognition: A Practical Case"
+author: "Emilio Delgado"
+date: "Saturday, June 20, 2015"
+output: html_document
+---
+
+## 1. Introduction
+Human Activity Recognition - **HAR** - has emerged as a key research area in the last years. Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. This data may be used to build models and make predictions about the type of activity being performed, how much of this activity, and, ultimately, how well this activity is being performed. 
+
+In this work we present a practical case based on the data collected from accelerometers  on the belt, forearm, arm, and dumbell of 6 participants while exercising barbell lifts in 6 different ways. The aim of this work is to build a model and make predictions about the way in which the exercise was performed for 20 test cases.
+
+This study is based on this reference: Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. _Qualitative Activity Recognition of Weight Lifting Exercises_. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3ddIN4TAv
+
+## 2. Data Preparation
+The training data was dowloaded from : https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv. It was read into a training data frame using the following code:
+```{r}
+training <- read.csv("pml-training.csv",as.is=TRUE,na.strings=c("NA","","#DIV/0!"),numerals="allow.loss")
+dim(training)
+
+```
+
+This data contains observations of the accelerometers readings at regular intervals. An sliding window is then used to compute main statistics (mean, variance, etc). Each observation is tagged with the subject's name, the timestamp and the window number. When a window is completed and a new one is started, this event is also tagged (by setting the variable new_window="yes"), and the completed window statistics are included in the corresponding row. All these tags are located in the first seven columns of the data set:
+
+```{r}
+head(training[,1:7])
+```
+
+
+As the purpose of the model is to predict only from actual, real-time sensor readings, we must not include in the training all these tags. We will also drop the columns that contain statistics, as the data they contain are not available in the testing data set. We can confirm this point by looking at the test data we are requested to use. This data is downloaded from : https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv, and read into a data frame using the same code as the training data:
+
+```{r}
+testing <- read.csv("pml-testing.csv",as.is=TRUE,na.strings=c("NA","","#DIV/0!"),numerals="allow.loss")
+dim (testing)
+nrow(testing[testing$new_column=="yes",])
+```
+
+The variable we want to predict is coded in the column **classe** by means of five letters. According to the article cited, class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.
+
+```{r}
+unique(training$classe)
+```
+ 
+We therefore will drop the mentioned rows and columns from the training data set. We will also convert the column classe into a factor so we can build a classification model:
+
+```{r}
+training <- training[training$new_window=="no",]
+training <- training[,c(-1,-2,-3,-4,-5,-6,-7)]
+training <- training[, colSums(is.na(training)) == 0]
+training$classe <- as.factor(training$classe)
+```
+
+where the third line clears all the columns with NAs, which eliminates indirectly all the columns corresponding to window statistics (that are only available at the begining of each window, i.e. when new_window=="yes")
+
+## 3. Building a Model
+
+We will use cross validation on the training data set in order to estimate the accuracy of the model. For that purpose we create a data partition with p=0.6. 
+
+```{r}
+library(caret)
+intrain1 <- createDataPartition(y=training$classe,p=0.6,list=FALSE)
+train1 <- training[intrain1,]
+test1 <- training[-intrain1,]
+```
+
+As stated in the introduction, our aim is to build a prediction model that predicts the class A,B,C,D,E from the sensor readings. We can start our analysis with a decission tree classification model:
+
+```{r}
+library(rpart)
+model <- rpart(classe~.,data=train1)
+
+```
+
+We can plot the resulting decission tree using the following code:
+```{r}
+library(rpart.plot)
+prp(model)
+
+```
+
+In this plot we can easily interpret the model and see what are main variables involved in the classification. We will next check the accuracy of this model using cross validation with the remaining part of the training data:
+
+```{r cache=TRUE}
+model1 <- rpart(classe~.,data=train1)
+predictions <- predict(model1,newdata=test1,type="class")
+cmatrix <- confusionMatrix(predictions,test1$classe)
+cmatrix
+```
+
+The 0.7 accuracy factor obtained is too low for our purposes, so we need to improve the training method. The article cited in the introduction already mentions that due to the inherent noise present in the sensor data, it is worth trying a *random forest* method. We therefore train our model with the following code:
+
+```{r cache=TRUE}
+library(randomForest)
+model2 <- randomForest(classe~.,data=train1)
+predictions <- predict(model2,newdata=test1)
+cmatrix <- confusionMatrix(predictions,test1$classe)
+cmatrix
+```
+
+Although less interpretable, this model has an accuracy estimation of 0.99, and we can confidently use this decission tree to produce our predictions for the assignment
+
+## 4. Prediction Results
+
+We produce our predictions with the following code:
+```{r}
+testing <- read.csv("pml-testing.csv",as.is=TRUE,na.strings=c("NA","","#DIV/0!"),numerals="allow.loss")
+answers <- predict(model,newdata=testing)
+
+```
+
+The 20 predictions were uploaded to the Coursera site for autograding, with a 100% pass rate.
